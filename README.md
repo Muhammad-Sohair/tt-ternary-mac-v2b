@@ -6,7 +6,7 @@ TMAC2B is [TMAC2](https://github.com/Muhammad-Sohair/tt-ternary-mac-v2) with twi
 array of multiplier-free ternary PEs on **3x2 tiles**, top module `tt_um_msohair_tmac2b`. It streams its
 weights from the QSPI Pmod flash exactly as TMAC2 does, at half the host traffic per output.
 
-**Status:** under investigation, not signed off, not submitted. TMAC2 (repo `tt-ternary-mac-v2`, tag
+**Status: stopped for TT SKY 26d (1 Nov 2026), not submitted.** The slew root cause was found and fixed (calibrated `LAYERS_RC`, notes/v2b_01–02), but the final run did not reach A's slew standard (notes/v2b_03); this is v3 input. TMAC2 (repo `tt-ternary-mac-v2`, tag
 `signoff-a`) is the shuttle's submission and is not affected by anything here. TMAC2B could only be added
 as a second design on TT SKY 26d if it reaches the full sign-off standard by 22 November 2026, and only if
 the slew root cause is found by 12 November ([notes/v2b_00](notes/v2b_00_separation_and_gates.md)).

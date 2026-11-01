@@ -40,7 +40,7 @@ Decided by the owner on 1 Nov 2026, after B had been stopped on 29 Oct (notes/v2
 |---|---|---|
 | repo split, CI running here | 1 Nov | **done** |
 | root cause identified | **12 Nov 2026** | **identified 1 Nov** (notes/v2b_01) |
-| B fully signed off | **22 Nov 2026** | — |
+| B fully signed off | **22 Nov 2026** | **not reached: B stopped 1 Nov** (notes/v2b_03) |
 | shuttle closes | 30 Nov 2026 | owner submits/pays |
 
 ## Progress log
@@ -50,3 +50,4 @@ Decided by the owner on 1 Nov 2026, after B had been stopped on 29 Oct (notes/v2
 | 1 Nov | repo split from `b-dev` (d5b47f4), module renamed; RTL 14/14 and devkit 2/2 locally. First CI here: gds 41295299103, docs, test all green; GL test and precheck pass. Hardening reproduces `b-dev` run 40698174384 exactly (util 69.7407 %, setup +2.481 ns, hold +0.093 ns, slew 122 / 96 pins at max_ss / nom_ss, 1 cap) — this is the investigation's baseline. A's repo: no new runs (latest still 2c24307, 29 Oct). |
 | 1 Nov | Local LibreLane 3.0.14 running in WSL2's Docker engine (Docker Desktop untouched). Sign-off view reproduces CI exactly. **Root cause:** repair's parasitic estimate uses the tech-LEF isolated-wire capacitance (~0.08 fF/µm) where extraction gives 0.17–0.21 fF/µm, so 100–600 µm nets look legal to repair; post-GRT repair also downsized 3 of the 29 final violators. Route length is not a factor. notes/v2b_01. Fix not chosen yet. |
 | 1 Nov | Option 1 (owner): `LAYERS_RC` fitted on 5,749 nets; override verified (long nets estimate/extraction ≈ 1.0). lrc1 hung (55 % repair margin); one adjustment, margin 20 % (lrc2, CI 41309116865): slew 122 → 4 pins / 1 net (+65 ps, max_ss only), util 71.2 %, setup/hold met everywhere, DRC/LVS/GL/precheck pass. Not yet at A's standard: slew 15 ps worse than A, clock-root max-cap violation. notes/v2b_02. |
+| 1 Nov | Final run (owner: option 2 on top of lrc2 = PnR-only max transition 0.65 ns + CTS buffer distance 70 µm; CI 41316591374): clock root fixed (fanout 16 → 2, cap 0.237 → 0.017 pF) but slew 60 / 33 pins, 13 nets, worst +2.1 ns; setup +1.18 ns; util 73.4 %. Decision rule → **B stops for SKY 26d.** Upstream: known since 2022 (open-pdks #251, #250); draft comment in notes/drafts, not posted. notes/v2b_03. |
