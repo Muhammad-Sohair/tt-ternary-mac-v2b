@@ -39,7 +39,7 @@ Decided by the owner on 1 Nov 2026, after B had been stopped on 29 Oct (notes/v2
 | gate | date | status |
 |---|---|---|
 | repo split, CI running here | 1 Nov | **done** |
-| root cause identified | **12 Nov 2026** | — |
+| root cause identified | **12 Nov 2026** | **identified 1 Nov** (notes/v2b_01) |
 | B fully signed off | **22 Nov 2026** | — |
 | shuttle closes | 30 Nov 2026 | owner submits/pays |
 
@@ -48,3 +48,4 @@ Decided by the owner on 1 Nov 2026, after B had been stopped on 29 Oct (notes/v2
 | date | status |
 |---|---|
 | 1 Nov | repo split from `b-dev` (d5b47f4), module renamed; RTL 14/14 and devkit 2/2 locally. First CI here: gds 41295299103, docs, test all green; GL test and precheck pass. Hardening reproduces `b-dev` run 40698174384 exactly (util 69.7407 %, setup +2.481 ns, hold +0.093 ns, slew 122 / 96 pins at max_ss / nom_ss, 1 cap) — this is the investigation's baseline. A's repo: no new runs (latest still 2c24307, 29 Oct). |
+| 1 Nov | Local LibreLane 3.0.14 running in WSL2's Docker engine (Docker Desktop untouched). Sign-off view reproduces CI exactly. **Root cause:** repair's parasitic estimate uses the tech-LEF isolated-wire capacitance (~0.08 fF/µm) where extraction gives 0.17–0.21 fF/µm, so 100–600 µm nets look legal to repair; post-GRT repair also downsized 3 of the 29 final violators. Route length is not a factor. notes/v2b_01. Fix not chosen yet. |
