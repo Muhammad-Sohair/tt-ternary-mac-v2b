@@ -1,16 +1,16 @@
 ## How it works
 
-TMAC2 is a 4 × 5 array of ternary (1.58-bit) processing elements that **fetches its own weights from external
+TMAC2B is an 8 × 5 array of ternary (1.58-bit) processing elements that **fetches its own weights from external
 QSPI flash**. Each weight is −1, 0 or +1, so a "multiply" is an add, a subtract or nothing, and the array has
 no multipliers. It carries an FPGA accelerator (Zynq-7020, 512 PEs) onto SKY130, with the same weight format
 and the same requantisation contract as the FPGA datapath. It is a superset of TMAC (v1): every v1 command
 works unchanged, so the chip is fully usable without the flash.
 
 - **Weights** are packed 5 per byte in base 3 (`byte = Σ (w_k+1)·3^k`, lowest index first; 1.6 bits per
-  weight). One row of 5 weights is exactly one byte, and the whole array is 4 bytes. Bytes 243–255 are
+  weight). One row of 5 weights is exactly one byte, and the whole array is 8 bytes. Bytes 243–255 are
   illegal: they load as zeros and set the sticky `ILLEGAL` flag. Weights come either over SPI (`LOAD_W`) or
   from the flash stream.
-- **Activations** are 5 signed int8 values shared by all four rows.
+- **Activations** are 5 signed int8 values shared by all eight rows.
 - **Compute** forms `dot_r = Σ_c w[r][c]·a[c]` for all rows (pipelined over two clocks) and adds it into a
   24-bit saturating accumulator (`CMP`), or overwrites it (`CMP_CLR`). Saturation clamps (never wraps) and sets
   a sticky per-row flag. 24 bits are exact for any reduction length K ≤ 65,535.
@@ -20,20 +20,20 @@ works unchanged, so the chip is fully usable without the flash.
 - **BIST** runs 32 LFSR-generated rounds through the real datapath and compares a 16-bit signature with the
   value computed by the Python reference model. PASS/DONE appear on output pins.
 
-### Flash weight stream (new in TMAC2)
+### Flash weight stream (as in TMAC2)
 
 The chip is a QSPI master for the W25Q128JV flash on the Tiny Tapeout QSPI Pmod, plugged into the
 bidirectional Pmod header. It uses Fast Read Quad Output (6Bh) and keeps one read open for a whole matrix:
 the flash auto-increments, and SCK simply stops between chunks.
 
 A weight matrix W (N × K) is stored in flash in the order the chip consumes it (`test/tmac_model.py`,
-`pack_stream`): rows in groups of 4, K in chunks of 5, and for each group, for each chunk, the 4 packed bytes
-of that 4 × 5 block. N and K are padded with zero weights; the host pads the activations with zeros.
+`pack_stream`): rows in groups of 8, K in chunks of 5, and for each group, for each chunk, the 8 packed bytes
+of that 8 × 5 block. N and K are padded with zero weights; the host pads the activations with zeros.
 Streams start on 256-byte boundaries.
 
 y = W·x then runs as: `FSTART page`, then for each row group: `CLEAR`, `LOAD_FC` with the K activations,
-`READ_ACC` (or `READ_RAW`) for 4 outputs. After every 5th activation of `LOAD_FC` the chip computes as soon
-as the matching 4 weight bytes are in the array, then fetches the next 4 bytes while the host sends the next
+`READ_ACC` (or `READ_RAW`) for 8 outputs. After every 5th activation of `LOAD_FC` the chip computes as soon
+as the matching 8 weight bytes are in the array, then fetches the next 8 bytes while the host sends the next
 activations. `uo[1]` (FLASH_READY) is high when a chunk is loaded and waiting.
 
 The flash timing is calibratable: `FCFG` sets the SCK divider (clk/2, /4, /8, /16; reset /4 = 12.5 MHz at
@@ -51,16 +51,16 @@ before the first SCK edge, and high ≥ 8 clk between frames.
 | op | command | data |
 |---|---|---|
 | 0x00 | STATUS | out: per-row SAT flags (bit r = row r), then status |
-| 0x10 | LOAD_W | in: 4 packed bytes, row 0 first (byte r = row r, columns 0–4) |
+| 0x10 | LOAD_W | in: 8 packed bytes, row 0 first (byte r = row r, columns 0–4) |
 | 0x20 | LOAD_A | in: 5 int8 activations, a[0] first |
 | 0x21 | LOAD_AC | in: activations; after every 5th byte, compute (accumulate). Stream any number of vectors |
 | 0x22 | LOAD_FC | in: activations; after every 5th byte, compute with the next weight chunk from flash |
 | 0x30 | CMP | acc += W·a |
 | 0x31 | CMP_CLR | acc = W·a |
-| 0x40 | READ_ACC | out: 4 × int16 `sat16(acc >>> shift)`, row 0 first, MSB first |
-| 0x41 | READ_RAW | out: 4 × 24-bit accumulators, MSB first |
-| 0x50 | READ_W | out: 5 bytes of stored 2-bit codes (−1=11, 0=00, +1=01), 4 per byte, lowest index in LSBs |
-| 0x60 | BIST | start the self-test (busy for 384 clk); closes an open flash stream |
+| 0x40 | READ_ACC | out: 8 × int16 `sat16(acc >>> shift)`, row 0 first, MSB first |
+| 0x41 | READ_RAW | out: 8 × 24-bit accumulators, MSB first |
+| 0x50 | READ_W | out: 10 bytes of stored 2-bit codes (−1=11, 0=00, +1=01), 4 per byte, lowest index in LSBs |
+| 0x60 | BIST | start the self-test (busy for 512 clk); closes an open flash stream |
 | 0x61 | READ_SIG | out: 16-bit BIST signature, MSB first (expected 0xA97E) |
 | 0x70 | CLEAR | zero accumulators, SAT, RSAT, ILLEGAL, PEND and OVERRUN |
 | 0x80 | SHIFT | in: one byte, readout shift = bits 4:0 |
@@ -78,11 +78,11 @@ Reset takes effect 2 clocks after `rst_n` (synchroniser).
 ## How to test
 
 1. Reset, then read STATUS: you should get 0x81. FSTAT should read 0x02, 0x05.
-2. Pulse `ui[3]` (BIST_START). After ~384 clocks `uo[2]` (DONE) and `uo[3]` (PASS) go high. This needs no SPI.
-3. Over SPI, try a hand-checkable example. Weights: `LOAD_W F2 79 79 79` (0xF2 = 242 = all +1; 0x79 = 121 =
-   all 0). Activations 1…5. Then `CMP_CLR` and `READ_RAW`: row 0 = 15, rows 1–3 = 0.
-4. Flash: write the same four bytes `F2 79 79 79` at flash address 0x000100 with the TT Flasher. Then
-   `FSTART 00 01`, `CLEAR`, `LOAD_FC 01 02 03 04 05`, `READ_RAW`: row 0 = 15, rows 1–3 = 0. If the
+2. Pulse `ui[3]` (BIST_START). After ~512 clocks `uo[2]` (DONE) and `uo[3]` (PASS) go high. This needs no SPI.
+3. Over SPI, try a hand-checkable example. Weights: `LOAD_W F2 79 79 79 79 79 79 79` (0xF2 = 242 = all +1; 0x79 =
+   121 = all 0). Activations 1…5. Then `CMP_CLR` and `READ_RAW`: row 0 = 15, rows 1–7 = 0.
+4. Flash: write the same eight bytes `F2 79 79 79 79 79 79 79` at flash address 0x000100 with the TT Flasher. Then
+   `FSTART 00 01`, `CLEAR`, `LOAD_FC 01 02 03 04 05`, `READ_RAW`: row 0 = 15, rows 1–7 = 0. If the
    weights read back wrong (`READ_W`), try other `FCFG` settings: a slower divider first, then the sample delay.
 5. The repository's `test/tmac_model.py` is the bit-exact reference for anything else.
 

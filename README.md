@@ -1,19 +1,24 @@
 ![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg)
 
-# TMAC2: a ternary (1.58-bit) MAC array that streams its weights from QSPI flash
+# TMAC2B: the 8-row TMAC2, as a separate Tiny Tapeout design
 
-Version 2 of [tt-ternary-mac](https://github.com/Muhammad-Sohair/tt-ternary-mac) for the Tiny Tapeout
-**SKY 26d** shuttle (SkyWater 130 nm). The v1 datapath is unchanged: a 4 × 5 array of multiplier-free
-ternary PEs with the FPGA's base-3 weight packing and `sat16(acc >>> shift)` requantisation
-([LLM-on-a-FPGA](https://github.com/Muhammad-Sohair/LLM-on-a-FPGA)). New in v2: a QSPI master that reads
-packed weights straight from the TT QSPI Pmod's W25Q128JV flash, so a whole weight matrix (all of
-TriLM-99M's ternary weights fit in the 16 MB flash) streams through the array while the host only sends
-activations. Every v1 command still works, so without the flash the chip behaves exactly like v1.
+TMAC2B is [TMAC2](https://github.com/Muhammad-Sohair/tt-ternary-mac-v2) with twice the rows: an **8 × 5**
+array of multiplier-free ternary PEs on **3x2 tiles**, top module `tt_um_msohair_tmac2b`. It streams its
+weights from the QSPI Pmod flash exactly as TMAC2 does, at half the host traffic per output.
 
-**Status:** RTL verified (14/14 cocotb tests); hardening in progress. Sign-off rules and dates:
-[notes/v2_00](notes/v2_00_plan_and_rules.md). Not submitted. The datasheet is in [docs/info.md](docs/info.md).
+**Status:** under investigation, not signed off, not submitted. TMAC2 (repo `tt-ternary-mac-v2`, tag
+`signoff-a`) is the shuttle's submission and is not affected by anything here. TMAC2B could only be added
+as a second design on TT SKY 26d if it reaches the full sign-off standard by 22 November 2026, and only if
+the slew root cause is found by 12 November ([notes/v2b_00](notes/v2b_00_separation_and_gates.md)).
+RTL: 16/16 cocotb tests. Hardening at 3x2 does not yet meet the slew standard ([notes/v2_05](notes/v2_05_b.md)).
 
-## v2 notes
+## Notes
+
+- [v2b_00 separation and gates](notes/v2b_00_separation_and_gates.md): why this is its own repo, the
+  rules and dates for the slew investigation.
+- [v2_05 B](notes/v2_05_b.md): the 8-row design, the four 3x2 runs, the repair-vs-extraction slew mismatch.
+
+Inherited from TMAC2 (they describe the 4-row design and cite TMAC2's runs, which live in `tt-ternary-mac-v2`):
 
 - [v2_00 plan and rules](notes/v2_00_plan_and_rules.md): the owner's go/no-go rules and the progress log.
 - [v2_01 spec](notes/v2_01_spec.md): options A/B/C, two corrections to earlier estimates.
@@ -25,9 +30,9 @@ The v1 sign-off numbers and notes below describe the v1 chip (tag `signoff-v7`),
 ## How the design works
 
 ```
-SPI (mode 0) -> command decoder -> packed weight bytes -> trit decoder -> W[4][5] (2-bit codes)
+SPI (mode 0) -> command decoder -> packed weight bytes -> trit decoder -> W[8][5] (2-bit codes)
                                 -> int8 activations a[5] ------------------------------+
-BIST (LFSR -> core -> MISR) -mux->  4 rows x 5 ternary PEs: dot = sum (a XOR neg)&nz + popcount(neg)
+BIST (LFSR -> core -> MISR) -mux->  8 rows x 5 ternary PEs: dot = sum (a XOR neg)&nz + popcount(neg)
                                     pipelined 24-bit saturating accumulators
 MISO <- status / sat16(acc >>> shift) / raw 24-bit / weights / BIST signature
 ```
@@ -62,8 +67,8 @@ python tmac_model.py --write-rtl              # regenerate the BIST signature af
 Hardening runs in GitHub Actions (`.github/workflows/gds.yaml`). The SKY130 cell models for gate-level
 simulation come from `ciel` (`ciel enable --pdk-family sky130 -l sky130_fd_sc_hd <version>`).
 
-`practice/counter/` holds the Step 1 design. The `acc24-shift-ref` tag and the `eval/4x10-acc24-3x2` branch
-keep the 4 × 10 versions for a later multi-tile chip.
+`practice/counter/` holds the Step 1 design. The 4 × 10 versions (tag `acc24-shift-ref`, branch
+`eval/4x10-acc24-3x2`) are in the v1 repo, `tt-ternary-mac`.
 
 ## License
 
