@@ -1,41 +1,59 @@
-# Session handoff — 2026-10-28 (v2)
+# Session handoff — 2026-11-01 (v2b, TMAC2B)
 
-## Progress against the owner's dates (notes/v2_00)
+**B is stopped for TT SKY 26d (owner's decision rule, 1 Nov).** A (repo `tt-ternary-mac-v2`, tag
+`signoff-a`, `main` green at 2c24307) is the only submission and was not touched by any of this work. Nothing
+was submitted or paid; B's tiles are not to be bought.
 
-| gate | date | status |
+## Gates
+
+| gate | date | outcome |
 |---|---|---|
-| A signed off (`signoff-a`) | 14 Nov 2026 | **Everything done except the owner's decision on two residuals.** Not tagged yet. |
-| B (8 rows, 3x2) may start | only if A signed off by 14 Nov | not started |
-| submit A, else v1 | 22 Nov 2026 | — |
-| shuttle closes | 30 Nov 2026 | — |
+| repo split, CI here | 1 Nov | done (d5b47f4; baseline run 41295299103 = old `b-dev` run exactly) |
+| root cause identified | 12 Nov 2026 | **met 1 Nov** (notes/v2b_01) |
+| B fully signed off | 22 Nov 2026 | **not reached**: final run failed the slew condition; B stopped |
+| shuttle closes | 30 Nov 2026 | owner submits A |
 
-## Where A stands
+## What was found (notes/v2b_01–03)
 
-- Repo **github.com/Muhammad-Sohair/tt-ternary-mac-v2** (public), `main` = A with
-  `GRT_DESIGN_REPAIR_MAX_SLEW_PCT` 55. Local clone `E:\extras\portfolio\ternary-silicon\v2`, branch `v2-dev`
-  tracks `origin/main`. v1 untouched in `..\v1`.
-- RTL 14/14, gate level 14/14 (incl. slow test), mutation 10/10 with a passing control.
-- 2x2, 63.8 % util, setup +4.88 ns, hold +0.103 ns, DRC/LVS/antenna 0, precheck passes. Re-run reproduces
-  0/318 metrics and the same GDS (timestamps masked).
-- **Residuals needing the owner's decision** (notes/v2_03): (1) one data net +50.5 ps over max-slew at
-  max_ss only, 0 at nom_ss; (2) max fanout 16 on the clock root `clkbuf_16` (our own limit is 8; its slew is
-  0.294 ns vs 0.75 ns) and 9 on one data buffer.
-- Evidence branches `eval/a-grt55`, `eval/a-nonor21`, `eval/a-3x2`: keep (notes/v2_03 cites them).
-  3x2 was worse (16/20 slew pins), so more tiles do not help.
+1. **Root cause.** Repair's parasitic estimate uses the sky130 tech-LEF isolated-wire capacitance
+   (~0.08 fF/µm) where sign-off extraction gives 0.16–0.21 fF/µm; route length is not a factor. Post-GRT
+   repair also downsized drivers on the optimistic view (3 of 29 final violators).
+2. **Fix.** `LAYERS_RC` fitted from extraction (5,749 nets, R² 0.996; resistance already matched the LEF).
+   Verified: estimate / extraction ≈ 1.0 on long nets (was ~0.4). The old 55 % post-GRT slew margin then hangs
+   repair; 20 % works.
+3. **Runs** (all DRC/LVS/antenna 0, precheck and GL test pass):
 
-## Next
+   | run | slew pins max_ss / nom_ss | worst | clock root | setup WS | util |
+   |---|---|---|---|---|---|
+   | baseline 41295299103 | 122 / 96 | +462 ps | fanout 16, cap viol. | +2.48 | 69.7 % |
+   | lrc2 41309116865 (`eval/lrc2`) | 4 / 0 (1 net) | +65 ps | fanout 16, cap viol. | +2.31 | 71.2 % |
+   | final 41316591374 (`eval/final`) | 60 / 33 (13 nets) | +2,105 ps | fanout 2, fixed | +1.18 | 73.4 % |
 
-1. Owner decides on the residuals. If accepted: tag `signoff-a` on `main`, freeze.
-2. If A is signed off by 14 Nov: B on its own branch (A + 8 rows, 3x2), same standard, by 22 Nov.
-3. C: only the two datasheet checks for the v3 plan (flash quad-read timing is already done in v2_02;
-   PSRAM APS6404L CS-low limit still open).
-4. Devkit bring-up script for the flash path (`devkit/`) is not written yet.
+## v3 input
 
-## Gotchas learned this session
+- Start from lrc2 (calibrated `LAYERS_RC`, margin 20 %) and fix only the clock root
+  (`CTS_DISTANCE_BETWEEN_BUFFERS`), without also tightening the PnR slew limit: the final run changed both and
+  the new long single-load nets (hold/fan-out buffers into 0.10–0.15 pF) are unexplained ([UNVERIFIED]).
+- Add `li1` and `VIAS_R` to the calibration (both read 0 in the resizer with design-level `LAYERS_RC`).
+- Upstream: known since 2022, open-pdks #251 (open) and #250 (removed sky130 `LAYERS_RC`). A comment with this
+  evidence is drafted in `notes/drafts/open-pdks-251-comment.md`, **not posted**: the owner decides.
+- C (PSRAM activations) and the APS6404L CS-low datasheet check remain v3 items (A's handoff).
 
-- A mutation harness needs a no-mutation control: without it, a broken build counts as "caught".
-- cocotb's Makefile uses `$(PWD)`: a subprocess must get `PWD` = the test dir with forward slashes.
-- A testbench model that takes its first value-change as the baseline misses that change.
-- LibreLane's post-GRT repair can *downsize* a gate to fix its input net; with a 40 % margin the GRT
-  estimate can hide a post-DRT slew violation. 55 % stopped it here.
-- GDS files differ run to run only in BGNLIB/BGNSTR timestamps; mask them to compare.
+## Tooling (works on this PC)
+
+- LibreLane 3.0.14 in **WSL2 Ubuntu's own Docker engine** (Docker Desktop untouched, still broken).
+  `ghcr.io/librelane/librelane:3.0.14` is the CI's exact build; PDK `8afc8346` in `~/pdk` via the image's
+  `ciel`. Full local flow in `~/v2b_local`; about 1 h+ per run with 4 CPUs / 3.9 GB, slower than CI in repair
+  and routing.
+- `tools/slew_probe/`: `probe.tcl` (repair view vs sign-off view on a CI run), `fit_layer_rc.py`,
+  `replay_postgrt_repair.tcl` (replay one step with knobs), `estimate_caps.*` (estimate vs extraction, all
+  nets).
+- Gotchas: Git Bash rewrites `/mnt/c/...` (use `MSYS_NO_PATHCONV=1`); LibreLane's private env (`_LIB_CORNER_*`,
+  `_LAYER_RC_*`, `_SDC_IN`, `_PNR_EXCLUDED_CELLS`) is not in `_env.tcl` and must be set when replaying a step;
+  SPEF caps can be in exponent form; `repair_design -verbose`'s "Remaining" counts nets to visit, not
+  violations.
+
+## Branches here
+
+`main` (notes, tools), `eval/lrc1` (hung, cancelled 41303043155), `eval/lrc2`, `eval/final`. Keep them: the
+notes cite their runs.
