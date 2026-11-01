@@ -38,7 +38,7 @@ Decided by the owner on 1 Nov 2026, after B had been stopped on 29 Oct (notes/v2
 
 | gate | date | status |
 |---|---|---|
-| repo split, CI running here | 1 Nov | see progress log |
+| repo split, CI running here | 1 Nov | **done** |
 | root cause identified | **12 Nov 2026** | — |
 | B fully signed off | **22 Nov 2026** | — |
 | shuttle closes | 30 Nov 2026 | owner submits/pays |
@@ -47,4 +47,4 @@ Decided by the owner on 1 Nov 2026, after B had been stopped on 29 Oct (notes/v2
 
 | date | status |
 |---|---|
-| 1 Nov | repo split from `b-dev`, module renamed; first CI run on the new repo (below) |
+| 1 Nov | repo split from `b-dev` (d5b47f4), module renamed; RTL 14/14 and devkit 2/2 locally. First CI here: gds 41295299103, docs, test all green; GL test and precheck pass. Hardening reproduces `b-dev` run 40698174384 exactly (util 69.7407 %, setup +2.481 ns, hold +0.093 ns, slew 122 / 96 pins at max_ss / nom_ss, 1 cap) — this is the investigation's baseline. A's repo: no new runs (latest still 2c24307, 29 Oct). |
